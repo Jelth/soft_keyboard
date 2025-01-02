@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../utils/enums.dart';
@@ -223,7 +225,23 @@ class _AlphanumericKeyboardState extends State<AlphanumericKeyboard> {
 
   // Renders the action keys
   Widget actionKey(SpecialKey kKey) {
-    return InkWell(
+    Timer? backspaceTimer;
+
+    void startBackspaceRepeat() {
+      backspaceTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
+        if (widget.controller.text.isNotEmpty) {
+          widget.controller.text = widget.controller.text
+              .substring(0, widget.controller.text.length - 1);
+        }
+      });
+    }
+
+    void stopBackspaceRepeat() {
+      backspaceTimer?.cancel();
+      backspaceTimer = null;
+    }
+
+    return GestureDetector(
       onTap: () {
         if (kKey == SpecialKey.backspace) {
           if (widget.controller.text.isNotEmpty) {
@@ -262,7 +280,17 @@ class _AlphanumericKeyboardState extends State<AlphanumericKeyboard> {
           });
         }
       },
-      borderRadius: BorderRadius.circular(widget.keyBorderRadius),
+      onLongPress: () {
+        if (kKey == SpecialKey.backspace) {
+          print("longpress detected");
+          startBackspaceRepeat();
+        }
+      },
+      onLongPressUp: () {
+        if (kKey == SpecialKey.backspace) {
+          stopBackspaceRepeat();
+        }
+      },
       child: Container(
         decoration: BoxDecoration(
           color: widget.actionKeyColor,
