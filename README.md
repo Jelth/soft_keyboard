@@ -1,3 +1,13 @@
+#**THIS IS A FORK OF SOFT KEYBOARD**
+
+## Things I added:
+
+- Support for quill
+- Cursor doesn't jump to the end of the text anymore
+- longpress backspace
+
+**CREDITS TO ASHIR14 (orignal creator)**
+
 # Soft Keyboard
 
 [![license](https://img.shields.io/github/license/Ashir14/widget_switcher)](https://github.com/Ashir14/soft_keyboard/blob/master/LICENSE)
