@@ -16,6 +16,7 @@ class NumericKeyboard extends StatefulWidget {
     this.keyBorderRadius = 10,
     this.actionKeyIconColor = Colors.white,
     this.onEnterTapped,
+    required this.onlyNumbers,
     super.key,
   });
 
@@ -52,6 +53,8 @@ class NumericKeyboard extends StatefulWidget {
   /// Callback Function for Enter Key
   final Function()? onEnterTapped;
 
+  final bool onlyNumbers;
+
   @override
   State<NumericKeyboard> createState() => _NumericKeyboardState();
 }
@@ -62,6 +65,13 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: keys
+          .where((e) {
+            // Filter niet-numerieke toetsen als onlyNumbers true is
+            if (widget.onlyNumbers) {
+              return RegExp(r'^\d+$').hasMatch(e); // Alleen cijfers toestaan
+            }
+            return true; // Alle toetsen toestaan als onlyNumbers false is
+          })
           .map(
             (e) => e == SpecialKey.space.name
                 ? Expanded(child: actionKey(SpecialKey.space))
@@ -78,7 +88,9 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
   Widget numberKey(String kKey) {
     return InkWell(
       onTap: () {
-        widget.controller.text += kKey;
+        if (!widget.onlyNumbers || RegExp(r'^\d+$').hasMatch(kKey)) {
+          widget.controller.text += kKey; // Alleen cijfers toevoegen
+        }
       },
       borderRadius: BorderRadius.circular(widget.keyBorderRadius),
       child: Container(
@@ -168,8 +180,6 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
       height: widget.height,
       color: widget.backgroundColor,
       child: Wrap(
-        // spacing: 10.0,
-        // runSpacing: 10.0,
         children: List.generate(
           KeyRows.numericRow.length,
           (index) {
