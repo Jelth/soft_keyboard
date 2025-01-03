@@ -4,7 +4,8 @@
 
 - Support for quill
 - Cursor doesn't jump to the end of the text anymore
-- longpress backspace
+- Longpress backspace
+- You can now also disable *-., on numeric_keyboard with bool onlyNumbers (could probably be done differently but I thought this was easier)
 
 **CREDITS TO ASHIR14 (orignal creator)**
 <br/>
