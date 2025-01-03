@@ -1,13 +1,14 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart' as quill;
 
 import '../utils/enums.dart';
 import '../utils/key_rows.dart';
 
 class AlphanumericKeyboard extends StatefulWidget {
   const AlphanumericKeyboard({
-    required this.controller,
+    this.controller,
+    this.quillController,
     this.height = 260,
     this.backgroundColor = const Color(0xff0a0a0a),
     this.actionKeyColor = const Color(0xff171717),
@@ -29,11 +30,14 @@ class AlphanumericKeyboard extends StatefulWidget {
     super.key,
   });
 
+  /// The optional controller for text fields
+  final TextEditingController? controller;
+
+  /// The optional Quill controller
+  final quill.QuillController? quillController;
+
   /// The height of the keyboard
   final double height;
-
-  /// The controller for the text field
-  final TextEditingController controller;
 
   /// The color for the keyboard background
   final Color backgroundColor;
@@ -95,7 +99,77 @@ class _AlphanumericKeyboardState extends State<AlphanumericKeyboard> {
 
   KeyBoardType keyboardType = KeyBoardType.alphanumeric;
 
-  // Renders the keyboard rows
+  void _insertText(String text) {
+    if (widget.controller != null) {
+      final currentText = widget.controller!.text;
+      final selection = widget.controller!.selection;
+
+      // Validatie van selectie
+      if (selection.start < 0 || selection.start > currentText.length) {
+        return; // Ongeldige selectie
+      }
+
+      // Voeg tekst in
+      final newText = currentText.replaceRange(
+        selection.start,
+        selection.end,
+        text,
+      );
+
+      // Update cursorpositie
+      final newCursorOffset = selection.start + text.length;
+
+      // Update TextEditingController
+      widget.controller!.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: newCursorOffset),
+      );
+    } else if (widget.quillController != null) {
+      final selection = widget.quillController!.selection;
+      widget.quillController!.replaceText(
+        selection.start,
+        selection.end - selection.start,
+        text,
+        TextSelection.collapsed(offset: selection.start + text.length),
+      );
+    }
+  }
+
+  void _deleteText() {
+    if (widget.quillController != null) {
+      final selection = widget.quillController!.selection;
+      if (selection.start > 0) {
+        widget.quillController!.replaceText(
+          selection.start - 1,
+          1,
+          '',
+          TextSelection.collapsed(offset: selection.start - 1),
+        );
+      }
+    } else if (widget.controller != null) {
+      if (widget.controller!.text.isNotEmpty) {
+        final currentText = widget.controller!.text;
+        final selection = widget.controller!.selection;
+
+        // Zorg dat de selectie geldig is
+        if (selection.start > 0 && selection.start <= currentText.length) {
+          // Verwijder één teken links van de cursor
+          final newText = currentText.replaceRange(
+            selection.start - 1,
+            selection.start,
+            '',
+          );
+
+          // Update de controller met de nieuwe tekst en cursorpositie
+          widget.controller!.value = TextEditingValue(
+            text: newText,
+            selection: TextSelection.collapsed(offset: selection.start - 1),
+          );
+        }
+      }
+    }
+  }
+
   Widget keyboardRow(List<String> keys) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -114,11 +188,10 @@ class _AlphanumericKeyboardState extends State<AlphanumericKeyboard> {
     );
   }
 
-  // Renders the number keys
   Widget numberKey(String kKey) {
     return InkWell(
       onTap: () {
-        widget.controller.text += kKey;
+        _insertText(kKey);
       },
       borderRadius: BorderRadius.circular(widget.keyBorderRadius),
       child: Container(
@@ -146,13 +219,12 @@ class _AlphanumericKeyboardState extends State<AlphanumericKeyboard> {
     );
   }
 
-  // Renders the alphabet keys
   Widget alphabetKey(String kKey) {
     return InkWell(
       onTap: () {
-        widget.controller.text += capitalization == Capitalization.lowerCase
+        _insertText(capitalization == Capitalization.lowerCase
             ? kKey.toLowerCase()
-            : kKey;
+            : kKey);
         if (capitalization == Capitalization.onlyFirstLetter) {
           setState(() {
             capitalization = Capitalization.lowerCase;
@@ -187,7 +259,61 @@ class _AlphanumericKeyboardState extends State<AlphanumericKeyboard> {
     );
   }
 
-  // Returns the icon for the action keys
+  Widget actionKey(SpecialKey kKey) {
+    Timer? backspaceTimer;
+
+    void startBackspaceRepeat() {
+      backspaceTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
+        _deleteText();
+      });
+    }
+
+    void stopBackspaceRepeat() {
+      backspaceTimer?.cancel();
+      backspaceTimer = null;
+    }
+
+    return GestureDetector(
+      onTap: () {
+        if (kKey == SpecialKey.backspace) {
+          _deleteText();
+        } else if (kKey == SpecialKey.space) {
+          _insertText(' ');
+        } else if (kKey == SpecialKey.enter) {
+          if (widget.onEnterTapped != null) {
+            widget.onEnterTapped!();
+          } else {
+            _insertText('\n');
+          }
+        }
+      },
+      onLongPress: () {
+        if (kKey == SpecialKey.backspace) {
+          startBackspaceRepeat();
+        }
+      },
+      onLongPressUp: () {
+        if (kKey == SpecialKey.backspace) {
+          stopBackspaceRepeat();
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: widget.actionKeyColor,
+          borderRadius: BorderRadius.circular(widget.keyBorderRadius),
+        ),
+        constraints: const BoxConstraints(
+          minWidth: 30,
+          minHeight: 40,
+        ),
+        margin: const EdgeInsets.all(3.5),
+        child: Center(
+          child: getActionKeyIcon(kKey),
+        ),
+      ),
+    );
+  }
+
   Widget? getActionKeyIcon(SpecialKey key) {
     IconData iconData;
     Color iconColor = widget.actionKeyIconColor;
@@ -220,94 +346,6 @@ class _AlphanumericKeyboardState extends State<AlphanumericKeyboard> {
       iconData,
       color: iconColor,
       size: iconSize,
-    );
-  }
-
-  // Renders the action keys
-  Widget actionKey(SpecialKey kKey) {
-    Timer? backspaceTimer;
-
-    void startBackspaceRepeat() {
-      backspaceTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
-        if (widget.controller.text.isNotEmpty) {
-          widget.controller.text = widget.controller.text
-              .substring(0, widget.controller.text.length - 1);
-        }
-      });
-    }
-
-    void stopBackspaceRepeat() {
-      backspaceTimer?.cancel();
-      backspaceTimer = null;
-    }
-
-    return GestureDetector(
-      onTap: () {
-        if (kKey == SpecialKey.backspace) {
-          if (widget.controller.text.isNotEmpty) {
-            widget.controller.text = widget.controller.text
-                .substring(0, widget.controller.text.length - 1);
-          }
-        } else if (kKey == SpecialKey.space) {
-          widget.controller.text += ' ';
-        } else if (kKey == SpecialKey.enter) {
-          if (widget.onEnterTapped != null) {
-            widget.onEnterTapped!();
-          } else {
-            widget.controller.text += '\n';
-          }
-        } else if (kKey == SpecialKey.capsLock) {
-          setState(() {
-            switch (capitalization) {
-              case Capitalization.lowerCase:
-                capitalization = Capitalization.onlyFirstLetter;
-                break;
-              case Capitalization.onlyFirstLetter:
-                capitalization = Capitalization.upperCase;
-                break;
-              case Capitalization.upperCase:
-                capitalization = Capitalization.lowerCase;
-                break;
-            }
-          });
-        } else if (kKey == SpecialKey.symbols) {
-          setState(() {
-            if (keyboardType == KeyBoardType.alphanumeric) {
-              keyboardType = KeyBoardType.symbols;
-            } else {
-              keyboardType = KeyBoardType.alphanumeric;
-            }
-          });
-        }
-      },
-      onLongPress: () {
-        if (kKey == SpecialKey.backspace) {
-          print("longpress detected");
-          startBackspaceRepeat();
-        }
-      },
-      onLongPressUp: () {
-        if (kKey == SpecialKey.backspace) {
-          stopBackspaceRepeat();
-        }
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: widget.actionKeyColor,
-          borderRadius: BorderRadius.circular(widget.keyBorderRadius),
-        ),
-        constraints: const BoxConstraints(
-          minWidth: 30,
-          minHeight: 40,
-        ),
-        margin: const EdgeInsets.all(3.5),
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: getActionKeyIcon(kKey),
-          ),
-        ),
-      ),
     );
   }
 
