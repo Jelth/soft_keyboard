@@ -1,4 +1,4 @@
-#**THIS IS A FORK OF SOFT KEYBOARD**
+# THIS IS A FORK OF SOFT KEYBOARD
 
 ## Things I added:
 
@@ -7,6 +7,13 @@
 - longpress backspace
 
 **CREDITS TO ASHIR14 (orignal creator)**
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
 
 # Soft Keyboard
 
