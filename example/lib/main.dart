@@ -68,6 +68,7 @@ class _MainScreenState extends State<MainScreen> {
             actionKeyColor: Colors.blueGrey,
             backspaceKeyIcon: Icons.backspace,
             enterKeyIcon: Icons.keyboard_return,
+            onlyNumbers: false,
           ),
         ],
       ),
