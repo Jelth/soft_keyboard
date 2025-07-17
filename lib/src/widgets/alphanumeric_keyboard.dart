@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 
@@ -27,6 +28,7 @@ class AlphanumericKeyboard extends StatefulWidget {
     this.keyBorderRadius = 10,
     this.actionKeyIconColor = Colors.white,
     this.onEnterTapped,
+    this.autoUpperCase = false,
     super.key,
   });
 
@@ -90,6 +92,8 @@ class AlphanumericKeyboard extends StatefulWidget {
   /// Callback Function for Enter Key
   final Function()? onEnterTapped;
 
+  final bool autoUpperCase;
+
   @override
   State<AlphanumericKeyboard> createState() => _AlphanumericKeyboardState();
 }
@@ -98,8 +102,21 @@ class _AlphanumericKeyboardState extends State<AlphanumericKeyboard> {
   Capitalization capitalization = Capitalization.onlyFirstLetter;
 
   KeyBoardType keyboardType = KeyBoardType.alphanumeric;
+  Timer? backspaceTimer;
+
+  @override
+  void dispose() {
+    // Annuleer de timer
+    backspaceTimer?.cancel();
+    backspaceTimer = null;
+    super.dispose();
+  }
 
   void _insertText(String text) {
+    if (widget.autoUpperCase) {
+      text = text.toUpperCase();
+    }
+
     if (widget.controller != null) {
       final currentText = widget.controller!.text;
       final selection = widget.controller!.selection;
@@ -138,12 +155,12 @@ class _AlphanumericKeyboardState extends State<AlphanumericKeyboard> {
   void _deleteText() {
     if (widget.quillController != null) {
       final selection = widget.quillController!.selection;
-      if (selection.start > 0) {
+      if (selection.baseOffset > 0 && selection.isCollapsed) {
         widget.quillController!.replaceText(
-          selection.start - 1,
+          selection.baseOffset - 1,
           1,
           '',
-          TextSelection.collapsed(offset: selection.start - 1),
+          TextSelection.collapsed(offset: selection.baseOffset - 1),
         );
       }
     } else if (widget.controller != null) {
@@ -171,20 +188,35 @@ class _AlphanumericKeyboardState extends State<AlphanumericKeyboard> {
   }
 
   Widget keyboardRow(List<String> keys) {
+    bool isLastRow = keys == KeyRows.lastRow;
+
+    final double keyWidth = (MediaQuery.of(context).size.width - 20) /
+        keys.length; // Dynamische breedte voor niet-spatie toetsen
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: keys
-          .map(
-            (e) => e == SpecialKey.space.name
-                ? Expanded(child: actionKey(SpecialKey.space))
-                : e.length > 1
-                    ? actionKey(SpecialKey.values
-                        .firstWhere((element) => element.name == e))
-                    : keys[0] == '1'
-                        ? numberKey(e)
-                        : alphabetKey(e),
-          )
-          .toList(),
+      children: keys.map((e) {
+        if (isLastRow && e == SpecialKey.space.name) {
+          // Speciale behandeling voor de spatiebalk
+          return Expanded(
+            flex: 4, // Maak de spatiebalk groter
+            child: actionKey(SpecialKey.space),
+          );
+        } else {
+          // Normale breedte voor andere toetsen
+          return Flexible(
+            flex: 1, // Standaardgrootte voor andere knoppen
+            child: SizedBox(
+              width: keyWidth,
+              child: e.length > 1
+                  ? actionKey(SpecialKey.values.firstWhere(
+                      (element) => element.name == e,
+                    ))
+                  : alphabetKey(e),
+            ),
+          );
+        }
+      }).toList(),
     );
   }
 
@@ -222,12 +254,14 @@ class _AlphanumericKeyboardState extends State<AlphanumericKeyboard> {
   Widget alphabetKey(String kKey) {
     return InkWell(
       onTap: () {
-        _insertText(capitalization == Capitalization.lowerCase
-            ? kKey.toLowerCase()
-            : kKey);
+        _insertText(
+          capitalization == Capitalization.lowerCase
+              ? kKey.toLowerCase()
+              : kKey.toUpperCase(),
+        );
         if (capitalization == Capitalization.onlyFirstLetter) {
           setState(() {
-            capitalization = Capitalization.lowerCase;
+            capitalization = Capitalization.lowerCase; // Reset naar lowercase
           });
         }
       },
@@ -246,7 +280,7 @@ class _AlphanumericKeyboardState extends State<AlphanumericKeyboard> {
           child: Text(
             capitalization == Capitalization.lowerCase
                 ? kKey.toLowerCase()
-                : kKey,
+                : kKey.toUpperCase(),
             style: widget.alphaNumericKeyTextStyle ??
                 const TextStyle(
                   fontSize: 16,
@@ -260,17 +294,20 @@ class _AlphanumericKeyboardState extends State<AlphanumericKeyboard> {
   }
 
   Widget actionKey(SpecialKey kKey) {
-    Timer? backspaceTimer;
-
     void startBackspaceRepeat() {
+      if (backspaceTimer != null) return;
+      log("DEBUG: Backspace timer has started");
       backspaceTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
         _deleteText();
       });
     }
 
     void stopBackspaceRepeat() {
-      backspaceTimer?.cancel();
-      backspaceTimer = null;
+      if (backspaceTimer != null) {
+        log("DEBUG: Backspace timer has stopped");
+        backspaceTimer!.cancel();
+        backspaceTimer = null;
+      }
     }
 
     return GestureDetector(
@@ -285,6 +322,17 @@ class _AlphanumericKeyboardState extends State<AlphanumericKeyboard> {
           } else {
             _insertText('\n');
           }
+        } else if (kKey == SpecialKey.capsLock) {
+          setState(() {
+            // Toggle de capitalization-status
+            if (capitalization == Capitalization.upperCase) {
+              capitalization = Capitalization.lowerCase;
+            } else if (capitalization == Capitalization.lowerCase) {
+              capitalization = Capitalization.upperCase;
+            } else if (capitalization == Capitalization.onlyFirstLetter) {
+              capitalization = Capitalization.upperCase;
+            }
+          });
         }
       },
       onLongPress: () {
@@ -321,10 +369,12 @@ class _AlphanumericKeyboardState extends State<AlphanumericKeyboard> {
 
     if (key == SpecialKey.capsLock) {
       iconData = capitalization == Capitalization.upperCase
-          ? widget.capsLockKeyIcon ?? Icons.arrow_circle_up
+          ? widget.capsLockKeyIcon ?? Icons.arrow_upward
           : widget.capsUnlockKeyIcon ?? Icons.arrow_upward;
 
       if (capitalization == Capitalization.onlyFirstLetter) {
+        iconColor = widget.firstLetterCapitalizationColor;
+      } else if (capitalization == Capitalization.upperCase) {
         iconColor = widget.firstLetterCapitalizationColor;
       }
     } else if (key == SpecialKey.backspace) {

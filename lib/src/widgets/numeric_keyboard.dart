@@ -64,23 +64,20 @@ class _NumericKeyboardState extends State<NumericKeyboard> {
   Widget keyboardRow(List<String> keys) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: keys
-          .where((e) {
-            // Filter niet-numerieke toetsen als onlyNumbers true is
-            if (widget.onlyNumbers) {
-              return RegExp(r'^\d+$').hasMatch(e); // Alleen cijfers toestaan
-            }
-            return true; // Alle toetsen toestaan als onlyNumbers false is
-          })
-          .map(
-            (e) => e == SpecialKey.space.name
-                ? Expanded(child: actionKey(SpecialKey.space))
-                : e.length > 1
-                    ? actionKey(SpecialKey.values
-                        .firstWhere((element) => element.name == e))
-                    : numberKey(e),
-          )
-          .toList(),
+      children: keys.where((e) {
+        // Filter niet-numerieke toetsen als onlyNumbers true is
+        if (widget.onlyNumbers) {
+          return RegExp(r'^\d+$').hasMatch(e); // Alleen cijfers toestaan
+        }
+        return true; // Alle toetsen toestaan als onlyNumbers false is
+      }).map(
+        (e) => e == SpecialKey.space.name
+            ? Expanded(child: actionKey(SpecialKey.space))
+            : e.length > 1
+                ? actionKey(SpecialKey.values
+                    .firstWhere((element) => element.name == e))
+                : numberKey(e),
+      ).toList(),
     );
   }
 
